@@ -16,3 +16,6 @@ rootfs/
 
 # compiled harness artifacts
 targets/*/harness/**/*_dbg
+
+# offline-brain run artifacts
+brain/

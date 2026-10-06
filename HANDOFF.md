@@ -506,8 +506,24 @@ guard math on real libs. If a regression appears it's almost certainly in
   throughput — today it's a confirmation/triage path, and long mutated String
   inputs are slow (NewStringUTF of MBs); bias the in-situ mutator to smaller sizes.
   Also: plumb `vra insitu` findings into the KB/report like the Qiling path.
-- **LLM loop**: never run against the real API (no key here) — needs one live
-  smoke test once `ANTHROPIC_API_KEY` exists.
+- **LLM loop**: live-tested two ways. API path reached Anthropic successfully
+  (auth/transport/forced-tool JSON all correct) but the account has $0 API credit
+  (Pro/Max subscription does NOT include API credits — separate prepaid billing).
+  **Offline-brain path works fully** (see below) and runs the identical loop on a
+  Claude subscription via Claude Code. A one-line API smoke test is still TODO for
+  whenever credits are added (just unset `VRA_OFFLINE_DIR`).
+
+### Offline brain (run the LLM loop WITHOUT API credits) — `vra/agent/offline.py`
+`VRA_OFFLINE_DIR=<dir>` swaps the HTTP transport in `llm.LLM` for a
+content-addressed file transport. The loop/steps/schemas/KB writes are UNCHANGED
+— only how one request is answered differs, so switching to the API later
+(unset the env var) behaves identically. Two-pass: run the agent once to emit
+prompts to `<dir>/pending/`, answer each (Claude Code, on the subscription, or a
+human) into `<dir>/cache/<key>.json`, re-run -> every step cache-hits and the
+loop completes exactly as the API would. CLI: `vra brain [--answer KEY --file J]
+[--clear]`. Validated on Allsafe: produced app_understanding + a P1 research plan
++ input_models, and the container fuzzer then consumed `+8 model seeds +10 dict`.
+Key is stored at `.anthropic_key` (chmod 600, git-ignored) for the API path.
 - **A real native MEMORY-bug target**: Allsafe's native is a safe logic check (no
   memory bug — correctly reported as clean by both engines). Still want a real APK
   that ships a vulnerable parser `.so` to demonstrate an end-to-end real finding;

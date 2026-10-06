@@ -209,6 +209,34 @@ def cmd_fuzzrun(args) -> int:
     return 0
 
 
+def cmd_brain(args) -> int:
+    """Offline-brain helper: list pending agent prompts, answer one, or clear.
+
+    Point VRA_OFFLINE_DIR at a dir, run `vra plan`/`vra agent`, then the model
+    steps that aren't answered yet land here. Answer each (write its JSON object)
+    and re-run — the loop completes identically to the API path."""
+    from .agent import offline
+    bdir = args.dir or os.environ.get("VRA_OFFLINE_DIR") or os.path.join(PROJECT_ROOT, "brain")
+    if args.clear:
+        print(f"cleared {offline.clear_pending(bdir)} pending prompt(s)")
+        return 0
+    if args.answer:
+        with open(args.file) as fh:
+            obj = json.load(fh)
+        offline.answer(bdir, args.answer, obj)
+        print(f"answered {args.answer}")
+        return 0
+    pend = offline.list_pending(bdir)
+    print(f"[brain] dir={bdir}  pending={len(pend)}")
+    for p in pend:
+        mode = next((ln for ln in p["system"].splitlines() if "MODE:" in ln), "")
+        req = p["schema"].get("required", [])
+        print(f"\n  --- {p['key']}  {mode.strip()}")
+        print(f"      required: {req}")
+        print("      " + p["user"][:300].replace("\n", "\n      "))
+    return 0
+
+
 def cmd_insitu(args) -> int:
     """In-situ Frida fuzz of one native on a booted device/emulator (real JNIEnv).
 
@@ -464,6 +492,14 @@ def main(argv=None) -> int:
     pp.add_argument("--no-llm", action="store_true",
                     help="only build the deterministic structure map")
     pp.set_defaults(func=cmd_plan)
+
+    pb = sub.add_parser("brain", help="offline-brain: list/answer/clear pending "
+                        "agent prompts (Claude Code answers instead of the API)")
+    pb.add_argument("--dir", help="brain dir (default $VRA_OFFLINE_DIR or ./brain)")
+    pb.add_argument("--answer", metavar="KEY", help="store an answer for KEY")
+    pb.add_argument("--file", help="JSON file with the answer object (with --answer)")
+    pb.add_argument("--clear", action="store_true", help="delete pending prompts")
+    pb.set_defaults(func=cmd_brain)
 
     psh = sub.add_parser("show", help="print KB summary")
     psh.add_argument("--name")

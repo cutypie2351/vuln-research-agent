@@ -58,8 +58,8 @@ def _load_key() -> Optional[str]:
 
 
 def available() -> bool:
-    """A key is all we need now (no SDK import)."""
-    return _load_key() is not None
+    """A key, OR an offline brain dir (Claude Code answers the calls), is enough."""
+    return _load_key() is not None or bool(os.environ.get("VRA_OFFLINE_DIR"))
 
 
 def _urllib_transport(url: str, headers: dict, body: bytes,
@@ -79,16 +79,24 @@ class LLM:
     def __init__(self, model: str = DEFAULT_MODEL, *,
                  transport: Optional[Transport] = None, max_retries: int = 4,
                  timeout: float = 120.0):
-        key = _load_key()
-        if key is None:
-            raise LLMUnavailable(
-                "No Anthropic API key. Set ANTHROPIC_API_KEY, or write it to "
-                f"{_KEY_FILES[0]} (chmod 600).")
         self.model = model
-        self._key = key
-        self._transport = transport or _urllib_transport
         self._max_retries = max_retries
         self._timeout = timeout
+        offline = os.environ.get("VRA_OFFLINE_DIR")
+        if transport is not None:
+            self._transport, self._key = transport, _load_key() or "offline"
+        elif offline:
+            # Claude Code / human answers the calls via the brain dir; no API key.
+            from .offline import offline_transport
+            self._transport, self._key = offline_transport(offline), "offline"
+        else:
+            key = _load_key()
+            if key is None:
+                raise LLMUnavailable(
+                    "No Anthropic API key. Set ANTHROPIC_API_KEY, write it to "
+                    f"{_KEY_FILES[0]} (chmod 600), or set VRA_OFFLINE_DIR for the "
+                    "offline brain.")
+            self._transport, self._key = _urllib_transport, key
 
     # -- public ------------------------------------------------------------
     def structured(self, system: str, user: str, schema: dict, *,
