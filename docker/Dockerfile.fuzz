@@ -1,0 +1,27 @@
+# Linux fuzzing/symbex host for the vuln-research-agent (plan §4-§5).
+# Runs amd64-native on the Intel mac host via Docker; arm64 .so are handled
+# inside via qiling/unicornafl (CPU emulation) and qemu-user-static.
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+# -o Acquire::Check-Date/Valid-Until=false: tolerate Docker Desktop VM clock
+# skew, which otherwise makes apt reject repo Release files as "not valid yet".
+RUN apt-get -o Acquire::Check-Date=false -o Acquire::Check-Valid-Until=false update \
+    && apt-get install -y --no-install-recommends \
+      afl++ \
+      clang llvm lld gdb \
+      build-essential cmake git ninja-build pkg-config \
+      python3 python3-pip python3-venv python3-dev \
+      qemu-user qemu-user-static binfmt-support \
+      libglib2.0-0 file binutils xxd \
+      wget curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Symbex + emulation-fuzzing Python stack (python 3.12 on 24.04 -> angr OK).
+RUN python3 -m pip install --break-system-packages --no-cache-dir \
+      angr qiling unicornafl lief capstone unicorn pwntools
+
+WORKDIR /work
+# Mount the harness + target KB at runtime:
+#   docker run --rm -it -v ~/vuln-research-agent:/work vra-fuzz
+CMD ["/bin/bash"]

@@ -1,0 +1,7 @@
+# First step (RE layer) runs on the stdlib alone — nothing here is required yet.
+# Optional: richer cross-format intake (ELF/PE mitigations, imagebase).
+lief>=0.14 ; python_version >= "3.8"
+
+# Later phases (orchestrator / fuzzing control) — not used yet:
+#   anthropic         # LLM decision layer (§8)
+#   pyyaml            # run configs
